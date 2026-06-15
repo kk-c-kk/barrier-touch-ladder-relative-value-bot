@@ -1,0 +1,18 @@
+# systemd unit for the touch-ladder logger (24/7 data collection).
+# Install: see DEPLOY.md. Adjust User / WorkingDirectory if your paths differ.
+[Unit]
+Description=Touch-ladder logger (barrier-touch-ladder-relative-value-bot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/barrier-touch-ladder-relative-value-bot
+ExecStart=/home/ubuntu/barrier-touch-ladder-relative-value-bot/.venv/bin/python scripts/run_logger.py
+Restart=always
+RestartSec=10
+# Logs go to the journal: `journalctl -u ladder-logger -f`
+
+[Install]
+WantedBy=multi-user.target
