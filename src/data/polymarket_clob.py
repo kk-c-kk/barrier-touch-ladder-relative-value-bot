@@ -1,15 +1,23 @@
-"""Read-only CLOB price client (reused from the 5min repo, unchanged).
+"""Read-only CLOB price client.
 
 Gamma returns null prices for open markets, so live share prices come from the
 CLOB order book. No auth needed for public price reads.
 
-  /price?token_id=..&side=buy  -> best ask (what you'd pay to BUY the share)
-  /price?token_id=..&side=sell -> best bid (what you'd receive to SELL the share)
-  /midpoint?token_id=..        -> book midpoint
+  CAREFUL — Polymarket's `side` names the SIDE OF THE BOOK, not your action.
+  Verified live against /book on 2026-06-15 (BTC reach-70k token):
+    /price?token_id=..&side=buy   -> best BID  (0.47)  == highest buy order
+    /price?token_id=..&side=sell  -> best ASK  (0.48)  == lowest sell order
+  So to BUY a share you pay the ASK (side=sell); to SELL you receive the BID
+  (side=buy). The 5min repo's client had these labelled backwards — it didn't
+  matter there (it found no edge anyway) but here it's fatal: marking a buy at the
+  bid instead of the ask manufactures ~1c of fake edge per leg.
 
-VALIDATION RULE (the whole project hinges on this): mark every hypothetical fill
-against `buy_price` (the real executable ask), never the midpoint. Mids flattered
-every prior strategy here into a fake edge.
+  /midpoint?token_id=..          -> book midpoint
+
+VALIDATION RULE (the whole project hinges on this): mark every hypothetical BUY
+against `buy_price` (the real executable ASK) and every SELL against `sell_price`
+(the real BID), never the midpoint. Mids/wrong-side prices flattered every prior
+strategy here into a fake edge.
 
 Returns None when no order book exists yet (market just opened or already settled).
 """
@@ -43,12 +51,14 @@ class PolymarketClob:
             return None
 
     def buy_price(self, token_id: str) -> float | None:
-        """Best ask: the price to BUY one share, 0..1. THE number to validate on."""
-        return self._price(token_id, "buy")
+        """Best ASK: the price to BUY one share, 0..1. THE number to validate buys on.
+        Polymarket returns the ask under side='sell' (sell side of the book)."""
+        return self._price(token_id, "sell")
 
     def sell_price(self, token_id: str) -> float | None:
-        """Best bid: the price you'd RECEIVE to sell one share, 0..1."""
-        return self._price(token_id, "sell")
+        """Best BID: the price you'd RECEIVE to sell one share, 0..1.
+        Polymarket returns the bid under side='buy' (buy side of the book)."""
+        return self._price(token_id, "buy")
 
     def midpoint(self, token_id: str) -> float | None:
         d = self._get("/midpoint", {"token_id": token_id})
