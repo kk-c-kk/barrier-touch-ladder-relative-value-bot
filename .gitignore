@@ -1,0 +1,34 @@
+# --- Anchored root ignores (leading slash) ------------------------------------
+# LESSON: an unanchored `data/` once also matched `src/data/` and silently kept a
+# whole package untracked. Anchor every root-folder ignore with a leading slash so
+# it cannot match a same-named subdirectory deeper in the tree.
+/data/
+/config.yaml
+/secrets.yaml
+/.env
+
+# --- Python -------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- SQLite (and WAL sidecars) ------------------------------------------------
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# --- Editor / OS --------------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

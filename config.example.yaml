@@ -1,0 +1,24 @@
+# Copy to config.yaml (gitignored) and edit as needed.
+
+# Underlying assets to discover ladders for. Diversify direction/window/asset to
+# dilute the cluster correlation of one-touch wings (one pump hits them together).
+assets: [BTC, ETH, SOL, XRP]
+
+# Public, read-only hosts. No API keys needed for the logger.
+gamma_host: https://gamma-api.polymarket.com
+clob_host: https://clob.polymarket.com
+hl_host:   https://api.hyperliquid.xyz
+
+# Snapshot cadence. The book is slow here (multi-day barriers) so 60s is plenty;
+# this is NOT a latency game.
+poll_interval_s: 60
+
+# Substring (lowercased) matches for touch-ladder event titles. Verify against a
+# live /events probe before trusting — Polymarket wording drifts.
+event_title_match: ["what price will", "hit", "reach"]
+
+# Realized-vol estimate: hourly candles over this lookback, annualized.
+realized_vol_lookback_h: 168   # 7 days
+
+# SQLite output (gitignored via /data/).
+db_path: data/ladders.sqlite
