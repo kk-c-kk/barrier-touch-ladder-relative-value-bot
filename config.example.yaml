@@ -17,6 +17,10 @@ poll_interval_s: 60
 # live /events probe before trusting — Polymarket wording drifts.
 event_title_match: ["what price will", "hit", "reach"]
 
+# Gamma /events caps at 100 rows/page; touch ladders span several pages (XRP and
+# most daily/weekly ladders sit past page 1). Pages scanned per discovery cycle.
+discovery_pages: 6
+
 # Realized-vol estimate: hourly candles over this lookback, annualized.
 realized_vol_lookback_h: 168   # 7 days
 

@@ -70,7 +70,8 @@ class LadderLogger:
         self.assets = cfg.get("assets")
         self.poll = int(cfg.get("poll_interval_s", 60))
         self.rv_lookback = int(cfg.get("realized_vol_lookback_h", 168))
-        self.gamma = GammaTouch(cfg["gamma_host"], cfg.get("event_title_match", []))
+        self.gamma = GammaTouch(cfg["gamma_host"], cfg.get("event_title_match", []),
+                                max_pages=int(cfg.get("discovery_pages", 6)))
         self.clob = PolymarketClob(cfg["clob_host"])
         self.spot_feed = HyperliquidSpot(cfg["hl_host"])
         self.db = sqlite3.connect(cfg["db_path"])

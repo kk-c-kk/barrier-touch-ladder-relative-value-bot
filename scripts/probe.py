@@ -53,7 +53,7 @@ def main():
 
     print("\n" + "=" * 70)
     print("STEP 2 — GammaTouch.discover() parsed rungs")
-    gamma = GammaTouch(GAMMA, TITLE_MATCH)
+    gamma = GammaTouch(GAMMA, TITLE_MATCH, max_pages=6)
     rungs = gamma.discover(ASSETS)
     print(f"  parsed rungs (BTC/ETH/SOL/XRP): {len(rungs)}")
     by_asset = {}

@@ -37,13 +37,21 @@ _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 
 # "$80,000" / "$80k" / "80,000" / "100k" -> 80000.0 / 100000.0
 _STRIKE_RE = re.compile(r"\$?\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*([kKmM]?)")
-# Crypto asset hints in a question/title.
+# Crypto asset hints in a question/title. Matched as WHOLE WORDS (\b...\b) — a bare
+# substring search mis-tagged "Ethena" and "Netherlands" (both contain "eth") and
+# "Tether" as Ethereum, polluting the ETH ladder with $0.04 strikes. Note "ether" is
+# deliberately dropped: it is not a real ticker and only invited false matches;
+# "ethereum"/"eth" cover the real markets.
 _ASSET_HINTS = {
     "BTC": ("btc", "bitcoin"),
-    "ETH": ("eth", "ether", "ethereum"),
+    "ETH": ("eth", "ethereum"),
     "SOL": ("sol", "solana"),
     "XRP": ("xrp", "ripple"),
     "DOGE": ("doge", "dogecoin"),
+}
+_ASSET_PATTERNS = {
+    asset: re.compile(r"\b(?:" + "|".join(hints) + r")\b", re.IGNORECASE)
+    for asset, hints in _ASSET_HINTS.items()
 }
 
 
@@ -81,9 +89,9 @@ def _parse_strike(text: str) -> float | None:
 
 
 def _detect_asset(text: str) -> str | None:
-    t = (text or "").lower()
-    for asset, hints in _ASSET_HINTS.items():
-        if any(h in t for h in hints):
+    t = text or ""
+    for asset, pat in _ASSET_PATTERNS.items():
+        if pat.search(t):
             return asset
     return None
 
@@ -104,11 +112,15 @@ class Rung:
 
 class GammaTouch:
     def __init__(self, gamma_host: str, title_match: list[str],
-                 timeout: int = 20, scan_limit: int = 200):
+                 timeout: int = 20, page_size: int = 100, max_pages: int = 6):
         self.host = gamma_host.rstrip("/")
         self.title_match = [t.lower() for t in title_match]
         self.timeout = timeout
-        self.scan_limit = scan_limit
+        # Gamma hard-caps /events at 100 rows per call, so a single scan saw only
+        # ~7 of ~48 live touch ladders (every asset's daily/weekly ladders, and all
+        # of XRP, sat on later pages). We page through `max_pages` to catch them.
+        self.page_size = min(page_size, 100)
+        self.max_pages = max_pages
         self._session = requests.Session()
         self._resolved: dict[str, str] = {}      # rung_slug -> "TOUCHED"/"MISS"
         self._res_last: dict[str, float] = {}
@@ -168,32 +180,44 @@ class GammaTouch:
     def discover(self, assets: list[str] | None = None) -> list[Rung]:
         """Return all live touch-ladder rungs across matching events.
 
-        `assets` (optional) filters to those tickers; None keeps every detected
-        crypto asset.
+        Pages through Gamma /events (100/page) up to `max_pages`, stopping early at
+        the last/empty page. `assets` (optional) filters to those tickers; None keeps
+        every detected crypto asset. Rungs are deduped by slug across pages.
         """
-        data = self._get("/events", {
-            "closed": "false", "active": "true", "limit": self.scan_limit,
-            "order": "volume24hr", "ascending": "false",
-        })
-        if data is None:
-            return []
-        events = data if isinstance(data, list) else data.get("data", [])
-        rungs: list[Rung] = []
         wanted = {a.upper() for a in assets} if assets else None
+        rungs: list[Rung] = []
+        seen: set[str] = set()
 
-        for ev in events:
-            title = str(ev.get("title", "") or ev.get("slug", ""))
-            if not self._title_matches(title):
-                continue
-            event_slug = str(ev.get("slug") or ev.get("id"))
-            asset_hint = _detect_asset(title)
-            for m in ev.get("markets", []) or []:
-                rung = self._parse_rung(m, event_slug, asset_hint)
-                if rung is None or rung.closed:
+        for page in range(self.max_pages):
+            data = self._get("/events", {
+                "closed": "false", "active": "true",
+                "limit": self.page_size, "offset": page * self.page_size,
+                "order": "volume24hr", "ascending": "false",
+            })
+            if data is None:
+                break
+            events = data if isinstance(data, list) else data.get("data", [])
+            if not events:
+                break
+
+            for ev in events:
+                title = str(ev.get("title", "") or ev.get("slug", ""))
+                if not self._title_matches(title):
                     continue
-                if wanted and rung.asset not in wanted:
-                    continue
-                rungs.append(rung)
+                event_slug = str(ev.get("slug") or ev.get("id"))
+                asset_hint = _detect_asset(title)
+                for m in ev.get("markets", []) or []:
+                    rung = self._parse_rung(m, event_slug, asset_hint)
+                    if rung is None or rung.closed or rung.rung_slug in seen:
+                        continue
+                    if wanted and rung.asset not in wanted:
+                        continue
+                    seen.add(rung.rung_slug)
+                    rungs.append(rung)
+
+            if len(events) < self.page_size:
+                break  # last page
+
         return rungs
 
     def get_resolution(self, rung_slug: str) -> str | None:
