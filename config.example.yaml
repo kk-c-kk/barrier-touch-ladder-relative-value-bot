@@ -22,3 +22,13 @@ realized_vol_lookback_h: 168   # 7 days
 
 # SQLite output (gitignored via /data/).
 db_path: data/ladders.sqlite
+
+# --- Trader (PAPER by default; live execution is not wired) -------------------
+trader_poll_s: 60
+min_edge: 0.03          # min |model_fair - price| (prob units) to act on a rung
+base_size: 100          # shares at exactly min_edge; scales linearly above it
+max_ticket: 500         # share cap per single leg
+max_cluster_risk: 2000  # max worst-case USD per (asset, expiry, side) cluster
+# ValidationGate: the trader refuses to size until the resolved data shows a
+# statistically significant edge over >= this many deduped trials.
+min_validation_n: 100
