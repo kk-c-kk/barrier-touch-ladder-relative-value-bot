@@ -20,6 +20,7 @@ from collections import defaultdict
 from src.analysis import load_trials, overall
 from src.data import GammaTouch, HyperliquidSpot, PolymarketClob
 from src.hedge import PaperHedge
+from src.monitor import Monitor
 from src.pricing import implied_vol, prob_touch, years_remaining
 from src.strategy import Position, RungQuote, SmileRV, TradeIntent
 
@@ -94,6 +95,7 @@ class Trader:
         self.hedge = PaperHedge()        # live hedge is a separate later step
         self.max_cluster_risk = float(cfg.get("max_cluster_risk", 2000.0))
         self._rv_cache: dict[str, tuple[float, float]] = {}
+        self.monitor = Monitor(cfg)      # optional web dashboard; no-op if disabled
 
     def _realized_vol(self, asset: str) -> float | None:
         rv, ts = self._rv_cache.get(asset, (None, 0.0))
@@ -146,6 +148,8 @@ class Trader:
         return intents
 
     def tick(self):
+        self.monitor.set_spot(self.monitor.headline_asset,
+                              self.spot_feed.spot(self.monitor.headline_asset))
         allowed, why = self.gate.status()
         rungs = self.gamma.discover(self.assets)
         quotes = [q for q in (self._quote(r) for r in rungs) if q is not None]
@@ -157,12 +161,17 @@ class Trader:
             for it in intents:                       # show what we WOULD do, size 0
                 log.info("[blocked] would %s %s %.0f sh @ %.3f (%s)",
                          it.side, it.rung_slug, it.size_shares, it.price, it.reason)
+            if intents:                              # one summary skip/tick (not per rung)
+                self.monitor.skip(f"gate blocked: {len(intents)} would-trade ({why})")
             return
 
         intents = self._apply_cluster_caps(intents)
         for it in intents:
             if it.size_shares >= 1:
                 self.executor.execute(it)
+                self.monitor.trade(side=it.side, price=it.price,
+                                   size=it.size_shares, pnl=0.0,
+                                   note=f"{it.rung_slug} {it.reason}")
         now = time.time()
         self.hedge.rebalance(self.executor.positions, self.spot_feed.spot,
                              self._realized_vol, now)

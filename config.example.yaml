@@ -36,3 +36,18 @@ max_cluster_risk: 2000  # max worst-case USD per (asset, expiry, side) cluster
 # ValidationGate: the trader refuses to size until the resolved data shows a
 # statistically significant edge over >= this many deduped trials.
 min_validation_n: 100
+
+# --- Web dashboard reporting (optional) ---------------------------------------
+# Reports to the central quant web reporter so the bot shows up in its dropdown.
+# Entirely optional: if enabled=false (or this block is removed) the bot runs
+# unchanged. The logger has no trades/PnL by design, so it shows as an online dot
+# + a live headline-asset price line; the paper trader also reports trades/skips.
+# The ingest API key (if the reporter service sets REPORTER_API_KEY) is read from
+# the bot's OWN env var REPORTER_API_KEY — never put it in this file.
+reporter:
+  enabled: false
+  base_url: http://127.0.0.1:8000   # same VPS as the reporter service
+  bot_id: touch-ladder-logger       # unique key = the dashboard dropdown entry
+  name: Touch-Ladder Logger
+  headline_asset: BTC               # which asset's spot drives the price chart
+  heartbeat_s: 10                   # < the dashboard's 20s offline window

@@ -23,6 +23,7 @@ import sqlite3
 import time
 
 from src.data import GammaTouch, HyperliquidSpot, PolymarketClob, Rung
+from src.monitor import Monitor
 from src.pricing import implied_vol, prob_touch, years_remaining
 
 log = logging.getLogger("ladder_logger")
@@ -80,6 +81,7 @@ class LadderLogger:
         self.db.executescript(_SCHEMA)
         self.db.commit()
         self._rv_cache: dict[str, tuple[float, float]] = {}  # asset -> (rv, ts)
+        self.monitor = Monitor(cfg)  # optional web dashboard; no-op if disabled
 
     def _realized_vol(self, asset: str) -> float | None:
         rv, ts = self._rv_cache.get(asset, (None, 0.0))
@@ -143,6 +145,10 @@ class LadderLogger:
                 log.info("resolved %s -> %s", slug, outcome)
 
     def tick(self):
+        # Feed the dashboard the headline spot (heartbeat thread re-emits it so the
+        # online dot stays green between 60s ticks).
+        self.monitor.set_spot(self.monitor.headline_asset,
+                              self.spot_feed.spot(self.monitor.headline_asset))
         rungs = self.gamma.discover(self.assets)
         log.info("discovered %d live rungs", len(rungs))
         for r in rungs:
