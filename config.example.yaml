@@ -24,8 +24,8 @@ discovery_pages: 6
 # Realized-vol estimate: hourly candles over this lookback, annualized.
 realized_vol_lookback_h: 168   # 7 days
 
-# SQLite output (gitignored via /data/).
-db_path: data/ladders.sqlite
+# SQLite output (gitignored). Folder is created at startup if missing.
+db_path: reports/ladders.sqlite
 
 # --- Trader (PAPER by default; live execution is not wired) -------------------
 trader_poll_s: 60
